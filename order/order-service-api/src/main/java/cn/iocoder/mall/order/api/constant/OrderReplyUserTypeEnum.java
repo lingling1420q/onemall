@@ -9,8 +9,8 @@ package cn.iocoder.mall.order.api.constant;
  */
 public enum  OrderReplyUserTypeEnum {
 
-    USER(1, "普通用户"),
-    MERCHANT(2, "商家");
+    USER(0, "普通用户"),
+    MERCHANT(1, "商家");
     /**
      * 状态值
      */

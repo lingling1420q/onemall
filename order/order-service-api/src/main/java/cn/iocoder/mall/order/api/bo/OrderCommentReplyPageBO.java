@@ -4,6 +4,7 @@ package cn.iocoder.mall.order.api.bo;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
@@ -15,19 +16,24 @@ import java.util.List;
  * @time 2019-05-19 14:19
  *
  */
-public class OrderCommentReplyPageBO {
+@Data
+@Accessors(chain = true)
+public class OrderCommentReplyPageBO implements Serializable {
 
+    /**
+     * 评论回复总数
+     */
     private Integer total;
 
     /**
      * 用户回复
      */
-    List<OrderCommentReplayUserItem> orderCommentReplayUserItems;
+    List<OrderCommentReplayItem> orderCommentReplayItems;
 
 
     @Data
     @Accessors(chain = true)
-    private static class OrderCommentReplayUserItem{
+    public static class OrderCommentReplayItem{
         /**
          * 回复 id
          */

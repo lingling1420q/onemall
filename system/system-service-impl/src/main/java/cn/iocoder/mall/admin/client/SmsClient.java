@@ -14,28 +14,53 @@ import java.util.Map;
  */
 public interface SmsClient {
 
+
+
     @Data
     @Accessors(chain = true)
     class SendResult {
 
-        private Boolean isSuccess;
+        public static final int SUCCESS_CODE = 0;
+        public static final int ERROR_CODE = 1;
+        public static final String SUCCESS_MESSAGE = "SUCCESS";
 
+        /**
+         * 错误码
+         */
         private Integer code;
-
+        /**
+         * 错误信息
+         */
         private String message;
+        /**
+         * 是否成功
+         */
+        private Boolean isSuccess;
     }
 
     /**
      * 短信发送 - 单个
      *
-     * @return
+     * @param mobile 手机号
+     * @param sign 签名
+     * @param templateCode 短信模板code
+     * @param template 短信模板
+     * @param templateParams 短信模板 params
+     * @return 发送后信息
      */
-    SendResult singleSend(String mobile, String sign, String template, Map<String, String> params);
+    SendResult singleSend(String mobile, String sign, String templateCode,
+                          String template, Map<String, String> templateParams);
 
     /**
      * 短信发送 - 批量
      *
-     * @return
+     * @param mobileList 手机号
+     * @param sign 签名
+     * @param templateCode 短信模板 code
+     * @param template 短信模板
+     * @param templateParams 短信模板params
+     * @return 发送后信息
      */
-    SendResult batchSend(List<String> mobileList, String sign, String template, Map<String, String> params);
+    SendResult batchSend(List<String> mobileList, String sign, String templateCode,
+                         String template, Map<String, String> templateParams);
 }

@@ -39,7 +39,7 @@ public interface SmsService {
      *
      * @param sign
      */
-    void createSign(String sign, Integer platform);
+    void addSign(String sign, Integer platform);
 
     /**
      * 签名 - 获取
@@ -68,10 +68,12 @@ public interface SmsService {
      * 模板 - 创建
      *
      * @param smsSignId 选用的哪个签名
+     * @param templateCode 模板code
      * @param template 模板内容
      * @param platform 平台
      */
-    void createTemplate(Integer smsSignId, String template, Integer platform, Integer smsType);
+    void addTemplate(Integer smsSignId, String templateCode,
+                     String template, Integer platform, Integer smsType);
 
     /**
      * 模板 - 获取
@@ -88,7 +90,8 @@ public interface SmsService {
      * @param template 模板内容
      * @param platform 短信平台
      */
-    void updateTemplate(Integer id, Integer smsSignId, String template, Integer platform, Integer smsType);
+    void updateTemplate(Integer id, Integer smsSignId, String templateCode,
+                        String template, Integer platform, Integer smsType);
 
     /**
      * 模板 - 删除
@@ -96,7 +99,6 @@ public interface SmsService {
      * @param id
      */
     void deleteTemplate(Integer id);
-
 
     /**
      * 短信发送 - 单个

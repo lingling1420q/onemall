@@ -2,7 +2,6 @@ package cn.iocoder.mall.admin.client;
 
 import cn.iocoder.common.framework.exception.ServiceException;
 import cn.iocoder.mall.admin.api.constant.AdminErrorCodeEnum;
-import cn.iocoder.mall.admin.api.constant.SmsApplyStatusEnum;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import org.apache.http.HttpEntity;
@@ -37,6 +36,7 @@ public class SmsYunPianClient implements SmsClient {
     protected static final Logger LOGGER = LoggerFactory.getLogger(SmsYunPianClient.class);
 
     private static final int SUCCESS_CODE = 0;
+    private static final String SUCCESS_MESSAGE = "SUCCESS";
 
     /**
      * 云片短信 - 批量推送最大数 500，支持 1000
@@ -92,12 +92,11 @@ public class SmsYunPianClient implements SmsClient {
     //编码格式。发送编码格式统一用UTF-8
     private static String ENCODING = "UTF-8";
 
-    @Value("${sms.yunPian.apiKey}")
+    @Value("${sms.yunPian.apiKey?:'default_value'}")
     private String apiKey;
 
     @Override
-    public SendResult singleSend(String mobile, String sign, String template, Map<String, String> templateParams) {
-
+    public SendResult singleSend(String mobile, String sign, String templateCode, String template, Map<String, String> templateParams) {
         // build 模板
         template = buildTemplate(sign, template, templateParams);
 
@@ -123,14 +122,17 @@ public class SmsYunPianClient implements SmsClient {
     }
 
     @Override
-    public SendResult batchSend(List<String> mobileList, String sign, String template, Map<String, String> templateParams) {
-
+    public SendResult batchSend(List<String> mobileList, String sign,
+                                String templateCode, String template,
+                                Map<String, String> templateParams) {
         // build 模板
         template = buildTemplate(sign, template, templateParams);
 
         // 最大发送数为 1000，我们设置为 500 个, 分段发送
         int maxSendSize = MAX_BATCH_SIZE;
-        int maxSendSizeCount = mobileList.size() % maxSendSize;
+        int maxSendSizeCount = mobileList.size() % maxSendSize == 0
+                ? mobileList.size() / maxSendSize
+                : mobileList.size() / maxSendSize + 1;
         int j = 0;
         int j2 = mobileList.size();
 
@@ -166,7 +168,7 @@ public class SmsYunPianClient implements SmsClient {
         return new SendResult()
                 .setIsSuccess(true)
                 .setCode(SUCCESS_CODE)
-                .setMessage(null);
+                .setMessage(SUCCESS_MESSAGE);
     }
 
     /**
@@ -174,17 +176,17 @@ public class SmsYunPianClient implements SmsClient {
      *
      * @param sign
      * @param template
-     * @param params
+     * @param templateParams
      * @return
      */
-    private static String buildTemplate(String sign, String template, Map<String, String> params) {
-        if (CollectionUtils.isEmpty(params)) {
+    private static String buildTemplate(String sign, String template,
+                                        Map<String, String> templateParams) {
+
+        if (CollectionUtils.isEmpty(templateParams)) {
             return template;
         }
 
-        LOGGER.debug("模板构建 before -> {}", template);
-
-        for (Map.Entry<String, String> entry : params.entrySet()) {
+        for (Map.Entry<String, String> entry : templateParams.entrySet()) {
             String paramsKey = entry.getKey();
             String value = entry.getValue();
             String paramPlace = String.format(PARAM_TEMPLATE, paramsKey);
@@ -192,30 +194,7 @@ public class SmsYunPianClient implements SmsClient {
         }
 
         template = String.format(SIGN_TEMPLATE, sign, template);
-        LOGGER.debug("模板构建 after -> {}", template);
         return template;
-    }
-
-    /**
-     * 短信 status 和 云片状态 映射关系
-     *
-     * @param checkStatus
-     * @return
-     */
-    private static Integer smsStatusMapping(String checkStatus) {
-        Integer applyStatus;
-        switch (checkStatus) {
-            case "SUCCESS":
-                applyStatus = SmsApplyStatusEnum.SUCCESS.getValue();
-                break;
-            case "FAIL":
-                applyStatus = SmsApplyStatusEnum.FAIL.getValue();
-                break;
-            default:
-                applyStatus = SmsApplyStatusEnum.CHECKING.getValue();
-                break;
-        }
-        return applyStatus;
     }
 
     /**
@@ -227,8 +206,6 @@ public class SmsYunPianClient implements SmsClient {
      */
 
     public static String post(String url, Map<String, String> paramsMap) {
-
-        // TODO: 2019/5/25 Sin 这个地方需要 记录日志
         CloseableHttpClient client = HttpClients.createDefault();
         String responseText = "";
         CloseableHttpResponse response = null;

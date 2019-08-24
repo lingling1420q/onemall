@@ -9,14 +9,14 @@
 
     <!--插入-->
     <insert id="insert" parameterType="OrderCommentReplyDO" useGeneratedKeys="true" keyColumn="id" keyProperty="id">
-        INSERT INTO `order_comment_replay`(comment_id,reply_type,parent_id,parent_user_id,parent_user_nick_name,parent_user_avatar,reply_content,reply_user_id
+        INSERT INTO order_comment_replay(comment_id,reply_type,parent_id,parent_user_id,parent_user_nick_name,parent_user_avatar,reply_content,reply_user_id,
         reply_user_nick_name,reply_user_avatar,user_type,create_time,update_time)
         VALUES (#{commentId},#{replyType},#{parentId},#{parentUserId},#{parentUserNickName},#{parentUserAvatar},#{replyContent},#{replyUserId},
         #{replyUserNickName},#{replyUserAvatar},#{userType},#{createTime},#{updateTime})
     </insert>
 
     <!--根据评论 id 和用户类型获取商家回复列表-->
-    <select id="selectCommentMerchantReplyByCommentId" resultType="cn.iocoder.mall.order.biz.dataobject.OrderCommentReplyDO">
+    <select id="selectCommentMerchantReplyByCommentIdAndUserType" resultType="cn.iocoder.mall.order.biz.dataobject.OrderCommentReplyDO">
         SELECT
         <include refid="FIELDS" />
         FROM order_comment_replay
@@ -30,7 +30,7 @@
     <!--根据评论 id 和用户类型获取评论总数-->
     <select id="selectCommentReplyTotalCountByCommentId" parameterType="Integer" resultType="java.lang.Integer">
         SELECT
-        COUNT (*)
+        COUNT(*)
         FROM order_comment_replay
         WHERE
         comment_id = #{commentId}
@@ -48,7 +48,34 @@
         AND
         user_type = #{userType}
         ORDER BY create_time DESC
-        LIMIT ${pageNo * pageSize}, ${pageSize}
+        LIMIT ${pageNo*pageSize},${pageSize}
+    </select>
+
+    <!--根据评论 id 查询商家最新的评论列表-->
+    <select id="selectCommentNewMerchantReplyByCommentIds" resultType="cn.iocoder.mall.order.biz.dataobject.OrderCommentReplyDO">
+        SELECT
+        <include refid="FIELDS" />
+        FROM order_comment_replay
+        WHERE
+        create_time=(SELECT
+        a.maxtime
+        FROM
+        (SELECT
+        MAX(create_time) AS maxtime,comment_id
+        FROM order_comment_replay
+        WHERE
+        comment_id IN
+        <foreach collection="commentIds" item="commentId" separator="," open="(" close=")">
+            #{commentId}
+        </foreach>
+        GROUP BY comment_id ) AS a)
+        AND
+        comment_id IN
+        <foreach collection="commentIds" item="commentId" separator="," open="(" close=")">
+            #{commentId}
+        </foreach>
+        AND
+        user_type = #{userType}
     </select>
 
 </mapper>

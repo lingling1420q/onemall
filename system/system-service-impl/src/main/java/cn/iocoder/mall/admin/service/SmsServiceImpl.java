@@ -2,22 +2,24 @@ package cn.iocoder.mall.admin.service;
 
 import cn.iocoder.common.framework.constant.DeletedStatusEnum;
 import cn.iocoder.common.framework.exception.ServiceException;
-import cn.iocoder.mall.admin.api.DataDictService;
+import cn.iocoder.mall.admin.api.SmsService;
+import cn.iocoder.mall.admin.api.bo.sms.PageSmsSignBO;
+import cn.iocoder.mall.admin.api.bo.sms.PageSmsTemplateBO;
+import cn.iocoder.mall.admin.api.bo.sms.SmsSignBO;
+import cn.iocoder.mall.admin.api.bo.sms.SmsTemplateBO;
+import cn.iocoder.mall.admin.api.constant.AdminErrorCodeEnum;
 import cn.iocoder.mall.admin.api.constant.SmsApplyStatusEnum;
 import cn.iocoder.mall.admin.api.constant.SmsPlatformEnum;
-import cn.iocoder.mall.admin.client.SmsClient;
-import cn.iocoder.mall.admin.api.SmsService;
-import cn.iocoder.mall.admin.api.bo.sms.SmsSignBO;
-import cn.iocoder.mall.admin.api.bo.sms.PageSmsSignBO;
-import cn.iocoder.mall.admin.api.bo.sms.SmsTemplateBO;
-import cn.iocoder.mall.admin.api.bo.sms.PageSmsTemplateBO;
-import cn.iocoder.mall.admin.api.constant.AdminErrorCodeEnum;
 import cn.iocoder.mall.admin.api.dto.sms.PageQuerySmsSignDTO;
 import cn.iocoder.mall.admin.api.dto.sms.PageQuerySmsTemplateDTO;
+import cn.iocoder.mall.admin.client.SmsAliYunClient;
+import cn.iocoder.mall.admin.client.SmsClient;
 import cn.iocoder.mall.admin.convert.SmsSignConvert;
 import cn.iocoder.mall.admin.convert.SmsTemplateConvert;
+import cn.iocoder.mall.admin.dao.SmsSendMapper;
 import cn.iocoder.mall.admin.dao.SmsSignMapper;
 import cn.iocoder.mall.admin.dao.SmsTemplateMapper;
+import cn.iocoder.mall.admin.dataobject.SmsSendLogDO;
 import cn.iocoder.mall.admin.dataobject.SmsSignDO;
 import cn.iocoder.mall.admin.dataobject.SmsTemplateDO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -28,11 +30,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 短信
@@ -44,12 +46,12 @@ import java.util.Map;
 @org.apache.dubbo.config.annotation.Service(validation = "true", version = "${dubbo.provider.SmsService.version}")
 public class SmsServiceImpl implements SmsService {
 
-    private static final String SMS_TEMPLATE = "【%s】%s";
-
     @Autowired
     private SmsSignMapper smsSignMapper;
     @Autowired
     private SmsTemplateMapper smsTemplateMapper;
+    @Autowired
+    private SmsSendMapper smsSendMapper;
 
     @Autowired
     @Qualifier("smsYunPianClient")
@@ -57,8 +59,6 @@ public class SmsServiceImpl implements SmsService {
     @Autowired
     @Qualifier("smsAliYunClient")
     private SmsClient smsAliYunClient;
-    @Autowired
-    private DataDictService dataDictService;
 
     @Override
     public PageSmsSignBO pageSmsSign(PageQuerySmsSignDTO queryDTO) {
@@ -69,10 +69,13 @@ public class SmsServiceImpl implements SmsService {
         if (!StringUtils.isEmpty(queryDTO.getSign())) {
             queryWrapper.like("sign", queryDTO.getSign());
         }
+        if (!StringUtils.isEmpty(queryDTO.getId())) {
+            queryWrapper.eq("id", queryDTO.getId());
+        }
 
         Page<SmsSignDO> page = new Page<SmsSignDO>()
-                .setSize(queryDTO.getPageSize())
-                .setCurrent(queryDTO.getPageCurrent())
+                .setSize(queryDTO.getSize())
+                .setCurrent(queryDTO.getCurrent())
                 .setDesc("create_time");
 
         IPage<SmsSignDO> signPage = smsSignMapper.selectPage(page, queryWrapper);
@@ -97,6 +100,9 @@ public class SmsServiceImpl implements SmsService {
         if (!StringUtils.isEmpty(queryDTO.getTemplate())) {
             queryWrapper.like("template", queryDTO.getTemplate());
         }
+        if (!StringUtils.isEmpty(queryDTO.getId())) {
+            queryWrapper.eq("id", queryDTO.getId());
+        }
 
         Page<SmsTemplateDO> page = new Page<SmsTemplateDO>()
                 .setSize(queryDTO.getSize())
@@ -104,8 +110,38 @@ public class SmsServiceImpl implements SmsService {
                 .setDesc("create_time");
 
         IPage<SmsTemplateDO> signPage = smsTemplateMapper.selectPage(page, queryWrapper);
+
         List<PageSmsTemplateBO.Template> templateList
                 = SmsTemplateConvert.INSTANCE.convert(signPage.getRecords());
+
+        if (CollectionUtils.isEmpty(templateList)) {
+            return new PageSmsTemplateBO()
+                    .setData(Collections.EMPTY_LIST)
+                    .setCurrent(signPage.getCurrent())
+                    .setSize(signPage.getSize())
+                    .setTotal(signPage.getTotal());
+        }
+
+        // 获取 sign
+
+        Set<Integer> smsSignIds = templateList.stream().map(
+                PageSmsTemplateBO.Template::getSmsSignId).collect(Collectors.toSet());
+
+        List<SmsSignDO> smsSignDOList = smsSignMapper.selectList(
+                new QueryWrapper<SmsSignDO>().in("id", smsSignIds));
+
+        List<PageSmsTemplateBO.Sign> signList = SmsTemplateConvert.INSTANCE.convertTemplateSign(smsSignDOList);
+
+        Map<Integer, PageSmsTemplateBO.Sign> smsSignDOMap = signList
+                .stream().collect(Collectors.toMap(PageSmsTemplateBO.Sign::getId, o -> o));
+
+        // 设置 sign
+
+        templateList.forEach(template -> {
+            if (smsSignDOMap.containsKey(template.getSmsSignId())) {
+                template.setSign(smsSignDOMap.get(template.getSmsSignId()));
+            }
+        });
 
         return new PageSmsTemplateBO()
                 .setData(templateList)
@@ -116,14 +152,14 @@ public class SmsServiceImpl implements SmsService {
 
     @Override
     @Transactional
-    public void createSign(String sign, Integer platform) {
+    public void addSign(String sign, Integer platform) {
 
         // 避免重复
         SmsSignDO smsSignDO = smsSignMapper.selectOne(
                 new QueryWrapper<SmsSignDO>()
                         .eq("platform", platform)
                         .eq("sign", sign)
-                        );
+        );
 
         if (smsSignDO != null) {
             throw new ServiceException(AdminErrorCodeEnum.SMS_SIGN_IS_EXISTENT.getCode(),
@@ -201,7 +237,8 @@ public class SmsServiceImpl implements SmsService {
 
     @Override
     @Transactional
-    public void createTemplate(Integer smsSignId, String template, Integer platform, Integer smsType) {
+    public void addTemplate(Integer smsSignId, String templateCode,
+                            String template, Integer platform, Integer smsType) {
 
         SmsSignDO smsSignDO = smsSignMapper.selectOne(
                 new QueryWrapper<SmsSignDO>().eq("id", smsSignId));
@@ -216,6 +253,7 @@ public class SmsServiceImpl implements SmsService {
                 (SmsTemplateDO) new SmsTemplateDO()
                         .setId(null)
                         .setSmsSignId(smsSignId)
+                        .setTemplateCode(templateCode)
                         .setTemplate(template)
                         .setPlatform(platform)
                         .setSmsType(smsType)
@@ -243,7 +281,8 @@ public class SmsServiceImpl implements SmsService {
 
     @Override
     @Transactional
-    public void updateTemplate(Integer id, Integer smsSignId, String template, Integer platform, Integer smsType) {
+    public void updateTemplate(Integer id, Integer smsSignId, String templateCode,
+                               String template, Integer platform, Integer smsType) {
         SmsTemplateDO smsTemplateDO = smsTemplateMapper.selectOne(
                 new QueryWrapper<SmsTemplateDO>().eq("id", id));
 
@@ -263,6 +302,7 @@ public class SmsServiceImpl implements SmsService {
         smsTemplateMapper.update(
                 (SmsTemplateDO) new SmsTemplateDO()
                         .setSmsSignId(smsSignId)
+                        .setTemplateCode(templateCode)
                         .setTemplate(template)
                         .setPlatform(platform)
                         .setSmsType(smsType)
@@ -314,7 +354,17 @@ public class SmsServiceImpl implements SmsService {
         // 获取 client
         SmsClient smsClient = getSmsClient(smsTemplateDO.getPlatform());
         // 发送短信
-        smsClient.singleSend(mobile, smsSignDO.getSign(), smsTemplateDO.getTemplate(), params);
+        SmsClient.SendResult sendResult = smsClient.singleSend(mobile, smsSignDO.getSign(),
+                smsTemplateDO.getTemplateCode(), smsTemplateDO.getTemplate(), params);
+
+        // 添加日志
+        smsSendMapper.insert(
+                (SmsSendLogDO) new SmsSendLogDO()
+                        .setTemplateId(smsTemplateDO.getId())
+                        .setTemplate(smsTemplateDO.getTemplate())
+                        .setMessage(sendResult.getMessage())
+                        .setCreateTime(new Date())
+        );
     }
 
     @Override
@@ -332,14 +382,34 @@ public class SmsServiceImpl implements SmsService {
                 new QueryWrapper<SmsSignDO>().eq("id", smsTemplateDO.getSmsSignId()));
 
         if (smsSignDO == null) {
+            // 添加日志
+            smsSendMapper.insert(
+                    (SmsSendLogDO) new SmsSendLogDO()
+                            .setTemplateId(smsTemplateDO.getId())
+                            .setTemplate(smsTemplateDO.getTemplate())
+                            .setMessage("发送成功!")
+                            .setCreateTime(new Date())
+            );
+
             throw new ServiceException(AdminErrorCodeEnum.SMS_SIGN_NOT_EXISTENT.getCode(),
                     AdminErrorCodeEnum.SMS_SIGN_NOT_EXISTENT.getMessage());
         }
 
         // 获取 client
         SmsClient smsClient = getSmsClient(smsTemplateDO.getPlatform());
+
         // 发送短信
-        smsClient.batchSend(mobileList, smsSignDO.getSign(), smsTemplateDO.getTemplate(), params);
+        SmsClient.SendResult sendResult = smsClient.batchSend(mobileList, smsSignDO.getSign(),
+                smsTemplateDO.getTemplateCode(), smsTemplateDO.getTemplate(), params);
+
+        // 添加日志
+        smsSendMapper.insert(
+                (SmsSendLogDO) new SmsSendLogDO()
+                        .setTemplateId(smsTemplateDO.getId())
+                        .setTemplate(smsTemplateDO.getTemplate())
+                        .setMessage(sendResult.getMessage())
+                        .setCreateTime(new Date())
+        );
     }
 
     /**

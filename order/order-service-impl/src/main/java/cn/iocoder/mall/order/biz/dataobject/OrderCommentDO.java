@@ -117,4 +117,9 @@ public class OrderCommentDO extends BaseDO {
      */
     private String commentPics;
 
+    /**
+     * 订单评论状态
+     */
+    private Integer commentState;
+
 }

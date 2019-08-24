@@ -1,12 +1,13 @@
 package cn.iocoder.mall.order.api;
 
-import cn.iocoder.mall.order.api.bo.OrderCommentCreateBO;
-import cn.iocoder.mall.order.api.bo.OrderCommentInfoAndMerchantReplyBO;
-import cn.iocoder.mall.order.api.bo.OrderCommentPageBO;
-import cn.iocoder.mall.order.api.constant.OrderReplyUserTypeEnum;
+import cn.iocoder.mall.order.api.bo.*;
 import cn.iocoder.mall.order.api.dto.OrderCommentCreateDTO;
 import cn.iocoder.mall.order.api.dto.OrderCommentPageDTO;
-import cn.iocoder.mall.order.api.dto.OrderCommentReplyCreateDTO;
+import cn.iocoder.mall.order.api.dto.OrderCommentStateInfoPageDTO;
+import cn.iocoder.mall.order.api.dto.OrderCommentTimeOutPageDTO;
+
+import java.util.Collection;
+import java.util.List;
 
 /**
  * 订单评论模块
@@ -24,12 +25,6 @@ public interface OrderCommentService {
     OrderCommentCreateBO createOrderComment(OrderCommentCreateDTO orderCommentCreateDTO);
 
 
-    /**
-     * 评论回复创建
-     * @param orderCommentReplyCreateDTO
-     * @return
-     */
-    Boolean createOrderCommentReply(OrderCommentReplyCreateDTO orderCommentReplyCreateDTO);
 
     /**
      * 获取评论列表的分页
@@ -40,20 +35,33 @@ public interface OrderCommentService {
 
 
     /**
-     * 获取评论详情和商家回复
+     * 获取评论详情
      * @param commentId
      * @return
      */
-    OrderCommentInfoAndMerchantReplyBO getOrderCommentInfo(Integer commentId, Integer userType);
-
+    OrderCommentInfoBO getOrderCommentInfo(Integer commentId);
 
 
     /**
-     * 订单评价超时自动好评
-     * 采用任务的形式执行
+     * 获取订单评论状态详情
+     * @param orderCommentStateInfoPageDTO
      * @return
      */
-    Boolean OrderCommentTimeOutProductCommentTask();
+    OrderCommentStateInfoPageBO getOrderCommentStateInfoPage(OrderCommentStateInfoPageDTO orderCommentStateInfoPageDTO);
+
+    /**
+     * 获取订单评论超时分页
+     * @param orderCommentTimeOutPageDTO
+     * @return
+     */
+    List<OrderCommentTimeOutBO> getOrderCommentTimeOutPage(OrderCommentTimeOutPageDTO orderCommentTimeOutPageDTO);
+
+
+    /**
+     * 批量更新订单评论状态
+     * @param orderCommentTimeOutBOList
+     */
+    void updateBatchOrderCommentState(List<OrderCommentTimeOutBO> orderCommentTimeOutBOList);
 
 
 
